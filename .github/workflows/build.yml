@@ -1,0 +1,63 @@
+name: Build wa-sqlite with FTS5
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:                # don’t run when only dist/ changes
+      - 'dist/**'
+
+env:
+  EM_CACHE_FOLDER: 'emsdk-cache'
+  EM_VERSION: 4.0.10
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout the code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        # clones your repo into the runner workspace
+
+      # 2. Setup Emscripten SDK
+      - name: Setup Emscripten
+        id: cache-system-libraries
+        uses: actions/cache@v3
+        with:
+          path: ${{env.EM_CACHE_FOLDER}}
+          key: ${{env.EM_VERSION}}-${{runner.os}}
+      - uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: ${{env.EM_VERSION}}
+          actions-cache-folder: ${{env.EM_CACHE_FOLDER}}
+      - run: emcc -v
+
+      # 3. Setup Node.js & Yarn
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+        # installs Node.js for running yarn
+
+      - name: Install dependencies
+        run: yarn install
+        # pulls in JS wrappers and build scripts
+      
+      # 4. Install Tcl development files
+      - name: Install Tcl development files
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y tcl-dev
+
+      # 5. Build with FTS5 enabled
+      - name: Build wa-sqlite with FTS5
+        run: make WASQLITE_EXTRA_DEFINES="-DSQLITE_ENABLE_FTS5"
+        # invokes the Makefile override
+
+      # 6. Commit the build artifacts
+      - name: Commit updated dist/
+        uses: EndBug/add-and-commit@v7
+        with:
+          message: 'CI: Build wa-sqlite with FTS5 [skip ci]'
+          add: 'dist/**'
